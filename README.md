@@ -19,7 +19,8 @@ Our Streamlit app will be created using the Snowsight UI web editor. You can als
 Once you complete Step 2, the editor window will open with a simple example Streamlit app. Delete the existing sample application code and paste the code below. This code imports a helper function to access a Snowpark session that connects to data in your Snowflake account, the Streamlit package, and altair for the creation of some custom charts. 
 ```
 from snowflake.snowpark.context import get_active_session
-from snowflake.snowpark.functions import sum, col
+from snowflake.snowpark.functions import lit, col, date_add, current_date, year, monthname, to_date 
+from snowflake.snowpark.types import DecimalType
 import altair as alt
 import streamlit as st
 
@@ -28,6 +29,8 @@ st.set_page_config(layout="wide")
 
 # Get current session
 session = get_active_session()
+
+st.header(":lightning_cloud: Weather and Environmental State Explorer")
 ```
 
 ## Step 4: Our first dataframe and widget
@@ -58,14 +61,15 @@ Paste this code below the `session = get_active_session()` line in your code edi
 ## Step 5: Define application datasets
 Next we'll define the datasets that we'll use in the visualization. Our `load_data()` has an argument of `filter_state`. This argument is used in the dataset creation. Once again, we use the `@st.cache_data()` [[docs](https://docs.streamlit.io/library/api-reference/performance/st.cache_data) decorator to cache the returned data. This will increase performance in the case of a re-run of the dataset for the same state. 
 
-We'll also use the `st.dataframe()` widget to examine and QA our data while we are developing.
+Note that we're able to create our data extracts using Snowpark dataframes and with SQL.
+
+We'll use the `st.dataframe()` widget to examine and QA our data while we are developing.
 
 Paste the code below after your `selected_state` widget in your code editor.
 
 ```
 @st.cache_data()
 def load_data(filter_state: str):
-    
 
     # use weather metrics data for daily precipitation
     weather_metrics_ts = session.table(f"{database_name}.{schema_name}.noaa_weather_metrics_timeseries")
@@ -75,11 +79,12 @@ def load_data(filter_state: str):
                                               .filter(col("state_name") == filter_state)
                            )
 
-    daily_precip = (metrics_and_stations.filter(col("variable") == "precipitation")
-                                        .filter(col("date") >= date_add(current_date(), -365))
-                                        .group_by(col("date"))
-                                        .avg(col("value")).alias("AVG_PRECIPITATION")
-                                        .sort("DATE")
+    daily_precip = (metrics_and_stations.filter(col('VARIABLE') == 'precipitation')
+                                        .filter(col('DATE') >= date_add(current_date(), -365))
+                                        .group_by(col('DATE'))
+                                        .avg(col('VALUE'))
+                                        .select(col("DATE"), col('AVG(VALUE)').cast(DecimalType(16,2)).alias('AVG_PRECIPITATION'))
+                                        .sort('DATE')
                     )
 
     #severe weather stats using SQL
@@ -103,10 +108,10 @@ def load_data(filter_state: str):
     insurance_claims = (flood_claim_index
                                .filter(col('DATE_OF_LOSS') >= to_date(lit('2010-01-01')))
                                .join(geo_index, flood_claim_index.state_geo_id == geo_index.geo_id, how="inner")
-                               .group_by([year(col("DATE_OF_LOSS")), col("NFIP_COMMUNITY_NAME")])
+                               .group_by([year(col("DATE_OF_LOSS")), monthname(col("DATE_OF_LOSS"))])
                                .sum(col('BUILDING_DAMAGE_AMOUNT'), col('CONTENTS_DAMAGE_AMOUNT'))
                                .rename({col('YEAR(DATE_OF_LOSS)'): 'YEAR_OF_LOSS',
-                                        col('NFIP_COMMUNITY_NAME'): 'COMMUNITY_NAME',
+                                        col('MONTHNAME(DATE_OF_LOSS)'): 'MONTH_OF_LOSS',
                                         col('SUM(BUILDING_DAMAGE_AMOUNT)'): 'BUILDING_DAMAGE_AMOUNT',
                                         col('SUM(CONTENTS_DAMAGE_AMOUNT)'): 'CONTENTS_DAMAGE_AMOUNT'
                                        })
@@ -118,8 +123,28 @@ def load_data(filter_state: str):
 
 # Load and cache data
 daily_precip, severe_weather, insurance_claims = load_data(selected_state)
+```
+## Step 5: Create visualizations
+Finally, we'll use Streamlit widgets to visualize the data. We'll also use the Streamlit tabs widget to organize our app. Delete the dataframe widgets from the previous section and paste the code below. 
 
-st.dataframe(daily_precip)
-st.dataframe(severe_weather)
-st.dataframe(insurance_claims)
+Notice that we're using native Streamlit visualizations for daily average precipitation and yearly severe weather days, but for Insurance Flood Losses we're using an Altair heatmap. This allows us to expand the capabilities of our dashboard with additional visualization types. 
+```
+daily_precip, severe_weather, insurance_claims = load_data(selected_state)
+
+tab1, tab2, tab3 = st.tabs(['Daily Average Precipitation', 'Yearly Severe Weather Days', 'Insurance Flood Losses by Year and Month' ])
+
+with tab1: 
+    st.line_chart(daily_precip, x="DATE")
+
+with tab2: 
+    st.bar_chart(severe_weather, x="YEAR", y="COUNT_SEVERE_WEATHER_DAYS")
+
+with tab3: 
+    heatmap = alt.Chart(insurance_claims).mark_rect().encode(
+                    x=alt.X('YEAR_OF_LOSS:N'),
+                    y=alt.Y('MONTH_OF_LOSS:N', sort=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']),
+                    color=alt.Color('BUILDING_DAMAGE_AMOUNT:Q', legend=alt.Legend(orient='bottom'))
+                )
+    
+    st.altair_chart(heatmap)
 ```
