@@ -35,6 +35,7 @@ session = get_active_session()
 
 st.header(":lightning_cloud: Weather and Environmental State Explorer")
 ```
+![Our first data-driven widget](img/just_the_filter.png)
 
 ## Step 4: Our first dataframe and widget
 Here we create a function to return a Pandas dataframe with all U.S. state names. We use the `@st.cache_data()` [[docs](https://docs.streamlit.io/library/api-reference/performance/st.cache_data) decorator to cache the returned data, which will improve performance for user interactions. 
