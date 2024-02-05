@@ -1,4 +1,7 @@
 # Streamlit Quickstart
+In this Quickstart tutorial, we'll be creating a Streamlit app in Snowflake. We'll use data from the Snowflake Marketplace and build an app to visualize data. We'll build this step by step in the readme file and the full finished code is available in [streamlit_app.py](streamlit_app.py).
+
+![Full Application](img/full_app.png)
 
 ## Step 1: Get dataset from the marketplace
 We will be using the [Cybersyn Weather & Environmental Essentials](https://app.snowflake.com/marketplace/listing/GZTSZAS2KIM/cybersyn-inc-weather-environmental-essentials?originTab=provider&providerName=Cybersyn%2C%20Inc&profileGlobalName=GZTSZAS2KCS) dataset from the Snowflake Marketplace. This dataset contains weather and environmental data from sources like the National Oceanic and Atmospheric Administration (NOAA), Our World in Data (OWID), the Emissions Database for Global Atmospheric Research (EDGAR), the Food and Agriculture Organization (FAO) of the UN, and the Federal Emergency Management Agency (FEMA). 
